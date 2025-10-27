@@ -1,5 +1,5 @@
 { stdenv, linux-pam, lib }: stdenv.mkDerivation {
-  name = "pam-test";
+  name = "pam_test";
 
   src = ../test;
 
