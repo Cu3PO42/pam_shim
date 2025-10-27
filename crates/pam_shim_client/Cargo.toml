@@ -1,0 +1,15 @@
+[package]
+name = "pam_shim_client"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pam_shim_common = { path = "../pam_shim_common" }
+libc = "0.2"
+serde-brief = { version = "0.1", features = ["std"] }
+
+[profile.release]
+panic = "abort"

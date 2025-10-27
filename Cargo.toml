@@ -1,0 +1,17 @@
+[workspace]
+members = ["crates/pam_shim_client", "crates/pam_shim_server", "crates/pam_shim_common"]
+
+[package]
+name = "pam_shim"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+# Optimize release builds for size and strip symbols from final artifacts
+[profile.release]
+opt-level = "z"          # Aggressive size optimizations
+lto = true                # Enable link-time optimization across crates
+codegen-units = 1         # Better cross-crate optimizations (may increase compile time)
+panic = "abort"          # Smaller binary by removing unwind info
+strip = "symbols"        # Strip symbol table for smallest binaries

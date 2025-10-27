@@ -1,0 +1,9 @@
+[package]
+name = "pam_shim_server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+pam_shim_common = { path = "../pam_shim_common" }
+libc = "0.2"
+serde-brief = { version = "0.1", features = ["std"] }
