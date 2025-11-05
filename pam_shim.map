@@ -1,0 +1,33 @@
+LIBPAM_1.0 {
+  global:
+    pam_acct_mgmt;
+    pam_authenticate;
+    pam_chauthtok;
+    pam_close_session;
+    pam_end;
+    pam_open_session;
+    pam_setcred;
+    pam_start;
+
+    /*
+    pam_fail_delay;
+    pam_get_item;
+    pam_getenv;
+    pam_getenvlist;
+    pam_putenv;
+    pam_set_item;
+    pam_strerror;
+    */
+
+  local: *;
+};
+
+LIBPAM_1.4 {
+  global:
+    pam_start_confdir;
+} LIBPAM_1.0;
+
+PAM_SHIM_1.0 {
+  global:
+    PAM_SHIM_MAGIC;
+};
