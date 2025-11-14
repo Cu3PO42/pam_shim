@@ -51,6 +51,64 @@ static bool write_str(struct buffered_fd *bfd, char **strp) {
     return true;
 }
 
+static bool handle_string_list(struct buffered_fd *bfd, char ***str_list_ptr, bool read) {
+    if (read) {
+        size_t count;
+        TRY(buffered_fd_read_exact(bfd, &count, sizeof(count)));
+        char **arr = malloc((count + 1) * sizeof(char *));
+        if (!arr) return false;
+        for (size_t i = 0; i < count; ++i) {
+            TRY(read_str(bfd, &arr[i]));
+        }
+        arr[count] = NULL;
+        *str_list_ptr = arr;
+    } else {
+        size_t count = 0;
+        for (char **str_list = *str_list_ptr; *str_list; ++str_list, ++count);
+        TRY(buffered_fd_write_exact(bfd, &count, sizeof(count)));
+        for (char **str_list = *str_list_ptr; *str_list; ++str_list) {
+            TRY(write_str(bfd, str_list));
+        }
+    }
+    return true;
+}
+
+static bool handle_pam_xauth_data(struct buffered_fd *bfd, struct pam_xauth_data **xauth, bool read) {
+    if (read) {
+        *xauth = malloc(sizeof(struct pam_xauth_data));
+        if (!*xauth) return false;
+    }
+    HANDLE((*xauth)->namelen);
+    HANDLE_STR(&(*xauth)->name);
+    HANDLE((*xauth)->datalen);
+    HANDLE_STR(&(*xauth)->data);
+    return true;
+}
+
+static bool handle_item(struct buffered_fd *bfd, int item_type, const void **item_ptr, bool read) {
+    switch (item_type) {
+        case PAM_SERVICE:
+        case PAM_USER:
+        case PAM_USER_PROMPT:
+        case PAM_TTY:
+        case PAM_RUSER:
+        case PAM_RHOST:
+        case PAM_AUTHTOK:
+        case PAM_OLDAUTHTOK:
+        case PAM_XDISPLAY:
+        case PAM_AUTHTOK_TYPE:
+            HANDLE_STR((char **)item_ptr);
+            break;
+        case PAM_XAUTHDATA:
+            TRY(handle_pam_xauth_data(bfd, (struct pam_xauth_data **)item_ptr, read));
+            break;
+        default:
+            // Unsupported item type
+            return false;
+    }
+    return true;
+}
+
 static bool handle_pam_message(struct buffered_fd *bfd, struct pam_message *msg, bool read) {
     HANDLE(msg->msg_style);
     HANDLE_STR((char **)&msg->msg);
@@ -93,6 +151,21 @@ static bool handle_shim_response(struct buffered_fd *bfd, struct shim_response *
             HANDLE_ARR(response->data.conversation.messages, response->data.conversation.message_count, pam_message_ptr);
             break;
         }
+        case PAM_SHIM_RESPONSE_AUTHENTICATE:
+            HANDLE(response->data.authenticate);
+            break;
+        case PAM_SHIM_RESPONSE_ITEM:
+            HANDLE(response->data.item.pam_status);
+            HANDLE(response->data.item.item_type);
+            TRY(handle_item(bfd, response->data.item.item_type, (const void **)&response->data.item.item, read));
+            break;
+        case PAM_SHIM_RESPONSE_STRING:
+            HANDLE_STR((char **)&response->data.string);
+            break;
+        case PAM_SHIM_RESPONSE_STRING_LIST: 
+            TRY(handle_string_list(bfd, &response->data.string_list, read));
+            break;
+
         case PAM_SHIM_RESPONSE_NONE:
         default:
             return false;
@@ -132,6 +205,20 @@ void shim_response_destroy(struct shim_response *response) {
             }
             break;
         }
+        case PAM_SHIM_RESPONSE_ITEM:
+            free_item(response->data.item.item_type, (void *)response->data.item.item);
+            break;
+        case PAM_SHIM_RESPONSE_STRING:
+            if (response->data.string) free((char *)response->data.string);
+            break;
+        case PAM_SHIM_RESPONSE_STRING_LIST: {
+            for (char **str = response->data.string_list; str && *str; str++) {
+                free(*str);
+            }
+            free(response->data.string_list);
+            break;
+        }
+
         case PAM_SHIM_RESPONSE_HANDLE:
         case PAM_SHIM_RESPONSE_RESULT:
         case PAM_SHIM_RESPONSE_NONE:
@@ -176,7 +263,22 @@ static bool handle_shim_request(struct buffered_fd *bfd, struct shim_request *re
         case PAM_SHIM_REQUEST_OPEN_SESSION:
         case PAM_SHIM_REQUEST_CLOSE_SESSION:
         case PAM_SHIM_REQUEST_CHAUTHTOK:
+        case PAM_SHIM_REQUEST_STRERROR:
+        case PAM_SHIM_REQUEST_GETENVLIST:
+        case PAM_SHIM_REQUEST_FAIL_DELAY:
             HANDLE(request->data.default_call);
+            break;
+        case PAM_SHIM_REQUEST_SET_ITEM:
+            HANDLE(request->data.set_item.handle);
+            HANDLE(request->data.set_item.item_type);
+            TRY(handle_item(bfd, request->data.set_item.item_type, &request->data.set_item.item, read));
+            break;
+        case PAM_SHIM_REQUEST_GET_ITEM:
+            HANDLE(request->data.get_item);
+        case PAM_SHIM_REQUEST_PUTENV:
+        case PAM_SHIM_REQUEST_GETENV:
+            HANDLE(request->data.env);
+            HANDLE_STR((char**)&request->data.env.name);
             break;
         case PAM_SHIM_REQUEST_NONE:
         default:
@@ -214,6 +316,15 @@ void shim_request_destroy(struct shim_request *request) {
             free_responses(responses, count);
             break;
         }
+
+        case PAM_SHIM_REQUEST_SET_ITEM:
+            free_item(request->data.set_item.item_type, (void *)request->data.set_item.item);
+            break;
+        
+        case PAM_SHIM_REQUEST_PUTENV:
+        case PAM_SHIM_REQUEST_GETENV:
+            if (request->data.env.name) free((char *)request->data.env.name);
+            break;
 
         case PAM_SHIM_REQUEST_END:
         case PAM_SHIM_REQUEST_SET_CRED:
