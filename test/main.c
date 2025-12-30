@@ -161,7 +161,7 @@ int main(int argc, char **argv)
 
 	int ret = pam_start(service, user, &conv, &pamh);
 	if (ret != PAM_SUCCESS) {
-		fprintf(stderr, "pam_start failed (code %d)\n", ret);
+		fprintf(stderr, "pam_start failed: %s\n", pam_strerror(pamh, ret));
 		return 1;
 	}
 
@@ -169,13 +169,13 @@ int main(int argc, char **argv)
 	if (ret == PAM_SUCCESS) {
 		fprintf(stdout, "Authentication success for user '%s' (service '%s')\n", user, service);
 	} else {
-		fprintf(stderr, "Authentication failed for user '%s' (service '%s'), code %d\n", user, service, ret);
+		fprintf(stderr, "Authentication failed for user '%s' (service '%s'): %s\n", user, service, pam_strerror(pamh, ret));
 	}
 
 	// End the PAM transaction; pass the last status
 	int end_ret = pam_end(pamh, ret);
 	if (end_ret != PAM_SUCCESS) {
-		fprintf(stderr, "pam_end returned code %d\n", end_ret);
+		fprintf(stderr, "pam_end returned: %s\n", pam_strerror(pamh, end_ret));
 	}
 
 	return ret == PAM_SUCCESS ? 0 : 1;

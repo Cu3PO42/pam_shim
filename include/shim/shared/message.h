@@ -16,6 +16,7 @@ enum shim_request_type {
     PAM_SHIM_REQUEST_CLOSE_SESSION,
     PAM_SHIM_REQUEST_CHAUTHTOK,
     PAM_SHIM_REQUEST_AUTHENTICATE_RESPONSE,
+    PAM_SHIM_REQUEST_STRERROR,
 };
 
 struct shim_request {
@@ -51,6 +52,7 @@ enum shim_response_type {
     PAM_SHIM_RESPONSE_HANDLE,
     PAM_SHIM_RESPONSE_RESULT,
     PAM_SHIM_RESPONSE_CONVERSATION,
+    PAM_SHIM_RESPONSE_STRERROR,
 };
 
 struct shim_response {
@@ -72,6 +74,11 @@ struct shim_response {
             const struct pam_message **messages;
             size_t message_count;
         } conversation;
+
+        // PAM_SHIM_RESPONSE_STRERROR
+        struct {
+            const char *error_string;
+        } strerror;
     } data;
 };
 

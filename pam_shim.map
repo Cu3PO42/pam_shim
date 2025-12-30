@@ -8,6 +8,7 @@ LIBPAM_1.0 {
     pam_open_session;
     pam_setcred;
     pam_start;
+    pam_strerror;
 
     /*
     pam_fail_delay;
@@ -16,7 +17,6 @@ LIBPAM_1.0 {
     pam_getenvlist;
     pam_putenv;
     pam_set_item;
-    pam_strerror;
     */
 
   local: *;

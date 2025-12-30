@@ -131,6 +131,14 @@ int main(int argc, char** argv){
             HANDLE_DEFAULT_PAM_CALL(PAM_SHIM_REQUEST_CHAUTHTOK, pam_chauthtok)
             #undef HANDLE_DEFAULT_PAM_CALL
 
+            case PAM_SHIM_REQUEST_STRERROR: {
+                response.type = PAM_SHIM_RESPONSE_STRERROR;
+                const char *str = pam_strerror((pam_handle_t *)request.data.default_call.handle,
+                                               request.data.default_call.flags);
+                response.data.strerror.error_string = strdup(str ? str : "Unknown error");
+                break;
+            }
+
             default:
                 fprintf(stderr, "Unknown request type: %d\n", request.type);
                 response.type = PAM_SHIM_RESPONSE_RESULT;

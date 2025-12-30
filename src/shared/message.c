@@ -93,6 +93,9 @@ static bool handle_shim_response(struct buffered_fd *bfd, struct shim_response *
             HANDLE_ARR(response->data.conversation.messages, response->data.conversation.message_count, pam_message_ptr);
             break;
         }
+        case PAM_SHIM_RESPONSE_STRERROR:
+            HANDLE_STR((char **)&response->data.strerror.error_string);
+            break;
         case PAM_SHIM_RESPONSE_NONE:
         default:
             return false;
@@ -132,6 +135,9 @@ void shim_response_destroy(struct shim_response *response) {
             }
             break;
         }
+        case PAM_SHIM_RESPONSE_STRERROR:
+            if (response->data.strerror.error_string) free((char *)response->data.strerror.error_string);
+            break;
         case PAM_SHIM_RESPONSE_HANDLE:
         case PAM_SHIM_RESPONSE_RESULT:
         case PAM_SHIM_RESPONSE_NONE:
@@ -176,6 +182,7 @@ static bool handle_shim_request(struct buffered_fd *bfd, struct shim_request *re
         case PAM_SHIM_REQUEST_OPEN_SESSION:
         case PAM_SHIM_REQUEST_CLOSE_SESSION:
         case PAM_SHIM_REQUEST_CHAUTHTOK:
+        case PAM_SHIM_REQUEST_STRERROR:
             HANDLE(request->data.default_call);
             break;
         case PAM_SHIM_REQUEST_NONE:
@@ -222,6 +229,7 @@ void shim_request_destroy(struct shim_request *request) {
         case PAM_SHIM_REQUEST_CLOSE_SESSION:
         case PAM_SHIM_REQUEST_CHAUTHTOK:
         case PAM_SHIM_REQUEST_AUTHENTICATE:
+        case PAM_SHIM_REQUEST_STRERROR:
         case PAM_SHIM_REQUEST_NONE:
         default:
             break;

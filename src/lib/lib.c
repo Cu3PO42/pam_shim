@@ -22,6 +22,7 @@ struct pam_handle {
     void *pam_server_handle;
     struct pam_conv *conv;
     struct remote remote;
+    char *last_error_string;
 };
 
 int pam_start_confdir(const char *service_name, const char *user,
@@ -36,6 +37,7 @@ int pam_start_confdir(const char *service_name, const char *user,
 
     handle->pam_server_handle = NULL; // Placeholder for actual server handle, will be filled later
     handle->conv = (struct pam_conv *)pam_conversation;
+    handle->last_error_string = NULL;
     if (!remote_init(&handle->remote)) {
         free(handle);
         return PAM_SYSTEM_ERR;
@@ -68,6 +70,7 @@ int pam_start_confdir(const char *service_name, const char *user,
 cleanup:
     shim_response_destroy(&start_response);
     remote_close(&handle->remote);
+    if (handle->last_error_string) free(handle->last_error_string);
     free(handle);
     return result;
 }
@@ -99,6 +102,7 @@ int pam_end(pam_handle_t *pamh, int pam_status) {
 cleanup:
     shim_response_destroy(&end_response);
     remote_close(&pamh->remote);
+    if (pamh->last_error_string) free(pamh->last_error_string);
     free(pamh);
     return result;
 }
@@ -196,3 +200,45 @@ IMPL(pam_open_session, PAM_SHIM_REQUEST_OPEN_SESSION)
 IMPL(pam_close_session, PAM_SHIM_REQUEST_CLOSE_SESSION)
 IMPL(pam_chauthtok, PAM_SHIM_REQUEST_CHAUTHTOK)
 #undef IMPL
+
+const char *pam_strerror(pam_handle_t *pamh, int errnum) {
+    if (!pamh) {
+        return "Unknown PAM error (null handle)";
+    }
+
+    if (pamh->last_error_string) {
+        free(pamh->last_error_string);
+        pamh->last_error_string = NULL;
+    }
+
+    struct shim_request request = {
+        .type = PAM_SHIM_REQUEST_STRERROR,
+        .data.default_call = {
+            .handle = pamh->pam_server_handle,
+            .flags = errnum,
+        },
+    };
+
+    if (!remote_send(&pamh->remote, &request)) {
+        return "System error (failed to send request)";
+    }
+
+    struct shim_response response = {0};
+    if (!remote_receive(&pamh->remote, &response)) {
+        return "System error (failed to receive response)";
+    }
+
+    if (response.type == PAM_SHIM_RESPONSE_STRERROR) {
+        pamh->last_error_string = (char *)response.data.strerror.error_string;
+        // Steal ownership so destroy doesn't free it
+        ((struct shim_response *)&response)->data.strerror.error_string = NULL;
+    }
+
+    shim_response_destroy(&response);
+
+    if (pamh->last_error_string) {
+        return pamh->last_error_string;
+    }
+
+    return "Unknown PAM error";
+}
