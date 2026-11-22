@@ -15,14 +15,12 @@
     packages = forAllSystemsWithPkgs (pkgs: rec {
       default = pkgs.callPackage ./nix/default.nix { };
       test = pkgs.callPackage ./nix/test.nix { };
-      test-with-shim = pkgs.replaceDependencies {
-        drv = test;
-        replacements = [
-          {
-            oldDependency = pkgs.linux-pam;
-            newDependency = default;
-          }
-        ];
+      # Built against the shim rather than rewritten afterwards: replaceDependencies
+      # only rewrites references in an existing output, so the binary it produces is
+      # never executed and its checks never run. This links the same way and keeps
+      # checkPhase, which is what makes the regression test meaningful here.
+      test-with-shim = pkgs.callPackage ./nix/test.nix {
+        linux-pam = default;
       };
     });
     homeModules.default = import ./nix/home-module.nix;

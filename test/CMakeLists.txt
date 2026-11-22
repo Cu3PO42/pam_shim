@@ -14,6 +14,11 @@ add_executable(pam_tester main.c)
 target_include_directories(pam_tester PRIVATE ${PAM_INCLUDE_DIR})
 target_link_libraries(pam_tester PRIVATE ${PAM_LIBRARY})
 
+# Non-interactive regression check; needs no PAM service configuration.
+add_executable(pam_strerror_check strerror_null.c)
+target_include_directories(pam_strerror_check PRIVATE ${PAM_INCLUDE_DIR})
+target_link_libraries(pam_strerror_check PRIVATE ${PAM_LIBRARY})
+
 install(TARGETS pam_tester 
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
